@@ -1,6 +1,7 @@
 <?php
 /**
- * Kadence Child – TeePublic-style color swap (STABLE + SAFE)
+ * Kadence Child – CORRECTED VERSION
+ * Works alongside Arton360 Designer plugin
  */
 
 if (!defined('TEE_COLOR_TAX')) {
@@ -9,6 +10,7 @@ if (!defined('TEE_COLOR_TAX')) {
 
 /**
  * ADMIN: Base T-shirt image field for color terms
+ * (Keep this - it's for manual product setup)
  */
 add_action(TEE_COLOR_TAX . '_add_form_fields', function () { ?>
     <div class="form-field term-group">
@@ -68,102 +70,234 @@ add_action('admin_enqueue_scripts', function ($hook) {
 });
 
 /**
- * PRODUCT PAGE: Layered base + artwork
+ * Check if this is an Arton360 designer product
  */
-add_action('woocommerce_single_product_summary', function () {
-    if (!is_product()) return;
+function is_arton360_designer_product($product_id) {
+    return (bool) get_post_meta($product_id, '_arton360_canvas_json', true);
+}
 
-    global $product;
-    if (!$product || !is_a($product, 'WC_Product')) return;
+/**
+ * UNIFIED: Handle color swapping for BOTH manual and designer products
+ * This replaces the gallery image with layered preview
+ */
+add_filter('woocommerce_single_product_image_thumbnail_html', 'unified_tee_color_preview', 10, 2);
 
-    // Only variable products
-    if (!$product->is_type('variable')) return;
+function unified_tee_color_preview($html, $attachment_id) {
+    if (!is_product()) {
+        return $html;
+    }
 
-    $product_id = $product->get_id();
+    global $post, $product;
+    if (!$post || !$product) {
+        return $html;
+    }
 
-    // IMPORTANT: temporarily DISABLE category restriction for debugging
-    // if (!has_term('tshirts', 'product_cat', $product_id)) return;
+    $product_id = $post->ID;
 
-    $artwork = get_the_post_thumbnail_url($product_id, 'full');
-    if (!$artwork) return;
+    // Skip if not variable product
+    if (!$product->is_type('variable')) {
+        return $html;
+    }
 
-    $terms = get_terms(['taxonomy' => TEE_COLOR_TAX, 'hide_empty' => false]);
-    if (is_wp_error($terms) || empty($terms)) return;
+    // Check if it's a t-shirt product
+    $is_tshirt = has_term('tshirts', 'product_cat', $product_id);
+    $is_designer = is_arton360_designer_product($product_id);
 
-    $map = [];
-    foreach ($terms as $term) {
-        $img_id = (int) get_term_meta($term->term_id, 'tee_base_image_id', true);
-        if ($img_id) {
-            $url = wp_get_attachment_image_url($img_id, 'full');
-            if ($url) $map[$term->slug] = $url;
+    if (!$is_tshirt && !$is_designer) {
+        return $html;
+    }
+
+    // Get artwork (featured image)
+    $artwork_url = get_the_post_thumbnail_url($product_id, 'large');
+    if (!$artwork_url) {
+        return $html;
+    }
+
+    // Build color-to-base-image map
+    $color_map = array();
+
+    if ($is_designer) {
+        // Use Arton360 plugin's hardcoded images
+        $base_url = plugin_dir_url(__FILE__ . '/../../plugins/arton360-designer-windows/arton360-designer.php') . 'arton360-designer-windows/assets/tshirts/';
+        $color_map = array(
+            'white' => $base_url . 'white.png',
+            'black' => $base_url . 'black.png',
+            'red'   => $base_url . 'red.png',
+            'gray'  => $base_url . 'gray.png',
+            'navy'  => $base_url . 'navy.png',
+        );
+    } else {
+        // Use term meta images (for manual products)
+        $terms = get_terms(['taxonomy' => TEE_COLOR_TAX, 'hide_empty' => false]);
+        if (!is_wp_error($terms)) {
+            foreach ($terms as $term) {
+                $img_id = (int) get_term_meta($term->term_id, 'tee_base_image_id', true);
+                if ($img_id) {
+                    $url = wp_get_attachment_image_url($img_id, 'full');
+                    if ($url) {
+                        $color_map[$term->slug] = $url;
+                    }
+                }
+            }
         }
     }
 
-    if (empty($map)) return;
+    if (empty($color_map)) {
+        return $html;
+    }
 
-    $base = reset($map);
+    // Get default color
+    $default_color = '';
+    $defaults = $product->get_default_attributes();
+    if (isset($defaults['pa_color'])) {
+        $default_color = sanitize_title($defaults['pa_color']);
+    }
+    if (empty($default_color) || !isset($color_map[$default_color])) {
+        $default_color = array_key_first($color_map);
+    }
 
-    // Make sure JS has the map
-    wp_enqueue_script(
-        'tee-color-swap',
-        get_stylesheet_directory_uri() . '/js/tee-color-swap.js',
-        ['jquery'],
-        '1.0.5',
-        true
-    );
+    $base_img = $color_map[$default_color];
 
-    wp_localize_script('tee-color-swap', 'TEE_SWAP', [
-        'tax' => TEE_COLOR_TAX,
-        'map' => $map,
-    ]);
-
+    // Output unified HTML structure
+    ob_start();
     ?>
-    <div class="tee-layered-wrap" style="position:relative;max-width:700px;margin:0 0 18px 0;">
-        <img id="tee-base-image" src="<?php echo esc_url($base); ?>" style="width:100%;height:auto;display:block;" />
-        <img id="tee-artwork-overlay" src="<?php echo esc_url($artwork); ?>" style="position:absolute;left:0;top:0;width:100%;height:auto;pointer-	events:none;" />
+    <div class="tee-layered-wrapper" data-product-id="<?php echo esc_attr($product_id); ?>">
+        <div class="tee-layered-inner">
+            <img
+                id="tee-base-image"
+                class="tee-base-image"
+                src="<?php echo esc_url($base_img); ?>"
+                alt="T-shirt base"
+            />
+            <img
+                id="tee-artwork-overlay"
+                class="tee-artwork-overlay"
+                src="<?php echo esc_url($artwork_url); ?>"
+                alt="Design artwork"
+            />
+        </div>
     </div>
     <?php
-}, 6);
+    return ob_get_clean();
+}
 
 /**
- * Hide default gallery only for tshirts
+ * UNIFIED: Enqueue color swap script for ALL t-shirt products
+ * (Only runs ONCE, on wp_enqueue_scripts)
  */
-add_action('wp_head', function () {
-    if (function_exists('is_product') && is_product() && has_term('tshirts', 'product_cat')) {
-        echo '<style>.woocommerce-product-gallery{display:none!important}</style>';
+add_action('wp_enqueue_scripts', 'unified_tee_enqueue_scripts', 20);
+
+function unified_tee_enqueue_scripts() {
+    if (!is_product()) {
+        return;
     }
-});
 
-/**
- * Enqueue JS + localize map
- */
-add_action('wp_enqueue_scripts', function () {
-    if (!function_exists('is_product') || !is_product()) return;
+    global $post, $product;
+    if (!$post || !$product) {
+        return;
+    }
 
-    global $product;
-    if (!$product || !is_a($product, 'WC_Product')) return;
-    if (!$product->is_type('variable')) return;
-    if (!has_term('tshirts', 'product_cat', $product->get_id())) return;
+    $product_id = $post->ID;
 
-    $map = [];
-    $terms = get_terms(['taxonomy' => TEE_COLOR_TAX, 'hide_empty' => false]);
-    if (!is_wp_error($terms)) {
-        foreach ($terms as $t) {
-            $img_id = (int) get_term_meta($t->term_id, 'tee_base_image_id', true);
-            if ($img_id) $map[$t->slug] = wp_get_attachment_image_url($img_id, 'full');
+    // Only for variable products
+    if (!$product->is_type('variable')) {
+        return;
+    }
+
+    // Check if it's a t-shirt or designer product
+    $is_tshirt = has_term('tshirts', 'product_cat', $product_id);
+    $is_designer = is_arton360_designer_product($product_id);
+
+    if (!$is_tshirt && !$is_designer) {
+        return;
+    }
+
+    // Build color map
+    $color_map = array();
+
+    if ($is_designer) {
+        // Use Arton360 plugin's images
+        $base_url = plugin_dir_url(__FILE__ . '/../../plugins/arton360-designer-windows/arton360-designer.php') . 'arton360-designer-windows/assets/tshirts/';
+        $color_map = array(
+            'white' => $base_url . 'white.png',
+            'black' => $base_url . 'black.png',
+            'red'   => $base_url . 'red.png',
+            'gray'  => $base_url . 'gray.png',
+            'navy'  => $base_url . 'navy.png',
+        );
+    } else {
+        // Use term meta images
+        $terms = get_terms(['taxonomy' => TEE_COLOR_TAX, 'hide_empty' => false]);
+        if (!is_wp_error($terms)) {
+            foreach ($terms as $term) {
+                $img_id = (int) get_term_meta($term->term_id, 'tee_base_image_id', true);
+                if ($img_id) {
+                    $url = wp_get_attachment_image_url($img_id, 'full');
+                    if ($url) {
+                        $color_map[$term->slug] = $url;
+                    }
+                }
+            }
         }
     }
 
+    if (empty($color_map)) {
+        return;
+    }
+
+    // Enqueue CSS
+    wp_add_inline_style('kadence-global', '
+        .tee-layered-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        .tee-layered-inner {
+            position: relative;
+            width: 100%;
+            padding-bottom: 100%; /* 1:1 aspect ratio */
+            overflow: hidden;
+        }
+        .tee-base-image,
+        .tee-artwork-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .tee-artwork-overlay {
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        /* Hide default WooCommerce gallery for t-shirts */
+        body.single-product.product-cat-tshirts .woocommerce-product-gallery:not(.tee-layered-wrapper),
+        body.arton360-designer-product .woocommerce-product-gallery:not(.tee-layered-wrapper) {
+            display: none !important;
+        }
+    ');
+
+    // Enqueue JS
     wp_enqueue_script(
         'tee-color-swap',
         get_stylesheet_directory_uri() . '/js/tee-color-swap.js',
-        ['jquery'],
-        '1.0.6',
+        array('jquery'),
+        '2.0.0', // Incremented version
         true
     );
 
-    wp_localize_script('tee-color-swap', 'TEE_SWAP', [
+    // Localize with unified data structure
+    wp_localize_script('tee-color-swap', 'TEE_SWAP', array(
         'tax' => TEE_COLOR_TAX,
-        'map' => $map,
-    ]);
-}, 20);
+        'map' => $color_map,
+    ));
+}
+
+/**
+ * REMOVE duplicate gallery hiding (handled by CSS above)
+ * This was causing conflicts
+ */
+// REMOVED: add_action('wp_head', ...) that hides gallery
