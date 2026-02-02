@@ -117,14 +117,41 @@ function unified_tee_color_preview($html, $attachment_id) {
     $color_map = array();
 
     if ($is_designer) {
-        // Use Arton360 plugin's hardcoded images
-        $base_url = plugin_dir_url(__FILE__ . '/../../plugins/arton360-designer-windows/arton360-designer.php') . 'arton360-designer-windows/assets/tshirts/';
+        // Use Arton360 plugin's hardcoded images - CORRECT PATH
+        $base_url = WP_PLUGIN_URL . '/arton360-designer-windows/assets/tshirts/';
         $color_map = array(
-            'white' => $base_url . 'white.png',
-            'black' => $base_url . 'black.png',
-            'red'   => $base_url . 'red.png',
-            'gray'  => $base_url . 'gray.png',
-            'navy'  => $base_url . 'navy.png',
+            'white'          => $base_url . 'white.png',
+            'black'          => $base_url . 'black.png',
+            'red'            => $base_url . 'red.png',
+            'gray'           => $base_url . 'gray.png',
+            'grey'           => $base_url . 'gray.png', // alias
+            'navy'           => $base_url . 'navy.png',
+            'ash'            => $base_url . 'ash.png',
+            'azalea'         => $base_url . 'azalea.png',
+            'baby-blue'      => $base_url . 'baby-blue.png',
+            'cardinal'       => $base_url . 'cardinal.png',
+            'charcoal'       => $base_url . 'charcoal.png',
+            'dark-chocolate' => $base_url . 'dark-chocolate.png',
+            'daisy'          => $base_url . 'daisy.png',
+            'forest'         => $base_url . 'forest.png',
+            'gold'           => $base_url . 'gold.png',
+            'kelly'          => $base_url . 'kelly.png',
+            'light-blue'     => $base_url . 'light-blue.png',
+            'light-pink'     => $base_url . 'light-pink.png',
+            'lime'           => $base_url . 'lime.png',
+            'maroon'         => $base_url . 'maroon.png',
+            'mint'           => $base_url . 'mint.png',
+            'natural'        => $base_url . 'natural.png',
+            'olive'          => $base_url . 'olive.png',
+            'orange'         => $base_url . 'orange.png',
+            'pink'           => $base_url . 'pink.png',
+            'purple'         => $base_url . 'purple.png',
+            'royal'          => $base_url . 'royal.png',
+            'sand'           => $base_url . 'sand.png',
+            'silver'         => $base_url . 'silver.png',
+            'sport-grey'     => $base_url . 'sport-grey.png',
+            'teal'           => $base_url . 'teal.png',
+            'yellow'         => $base_url . 'yellow.png',
         );
     } else {
         // Use term meta images (for manual products)
@@ -216,14 +243,41 @@ function unified_tee_enqueue_scripts() {
     $color_map = array();
 
     if ($is_designer) {
-        // Use Arton360 plugin's images
-        $base_url = plugin_dir_url(__FILE__ . '/../../plugins/arton360-designer-windows/arton360-designer.php') . 'arton360-designer-windows/assets/tshirts/';
+        // Use Arton360 plugin's images - CORRECT PATH
+        $base_url = WP_PLUGIN_URL . '/arton360-designer-windows/assets/tshirts/';
         $color_map = array(
-            'white' => $base_url . 'white.png',
-            'black' => $base_url . 'black.png',
-            'red'   => $base_url . 'red.png',
-            'gray'  => $base_url . 'gray.png',
-            'navy'  => $base_url . 'navy.png',
+            'white'          => $base_url . 'white.png',
+            'black'          => $base_url . 'black.png',
+            'red'            => $base_url . 'red.png',
+            'gray'           => $base_url . 'gray.png',
+            'grey'           => $base_url . 'gray.png',
+            'navy'           => $base_url . 'navy.png',
+            'ash'            => $base_url . 'ash.png',
+            'azalea'         => $base_url . 'azalea.png',
+            'baby-blue'      => $base_url . 'baby-blue.png',
+            'cardinal'       => $base_url . 'cardinal.png',
+            'charcoal'       => $base_url . 'charcoal.png',
+            'dark-chocolate' => $base_url . 'dark-chocolate.png',
+            'daisy'          => $base_url . 'daisy.png',
+            'forest'         => $base_url . 'forest.png',
+            'gold'           => $base_url . 'gold.png',
+            'kelly'          => $base_url . 'kelly.png',
+            'light-blue'     => $base_url . 'light-blue.png',
+            'light-pink'     => $base_url . 'light-pink.png',
+            'lime'           => $base_url . 'lime.png',
+            'maroon'         => $base_url . 'maroon.png',
+            'mint'           => $base_url . 'mint.png',
+            'natural'        => $base_url . 'natural.png',
+            'olive'          => $base_url . 'olive.png',
+            'orange'         => $base_url . 'orange.png',
+            'pink'           => $base_url . 'pink.png',
+            'purple'         => $base_url . 'purple.png',
+            'royal'          => $base_url . 'royal.png',
+            'sand'           => $base_url . 'sand.png',
+            'silver'         => $base_url . 'silver.png',
+            'sport-grey'     => $base_url . 'sport-grey.png',
+            'teal'           => $base_url . 'teal.png',
+            'yellow'         => $base_url . 'yellow.png',
         );
     } else {
         // Use term meta images
@@ -285,7 +339,7 @@ function unified_tee_enqueue_scripts() {
         'tee-color-swap',
         get_stylesheet_directory_uri() . '/js/tee-color-swap.js',
         array('jquery'),
-        '2.0.0', // Incremented version
+        '2.0.1', // Incremented version for cache busting
         true
     );
 
@@ -295,9 +349,3 @@ function unified_tee_enqueue_scripts() {
         'map' => $color_map,
     ));
 }
-
-/**
- * REMOVE duplicate gallery hiding (handled by CSS above)
- * This was causing conflicts
- */
-// REMOVED: add_action('wp_head', ...) that hides gallery
